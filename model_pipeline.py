@@ -31,15 +31,14 @@ XGB_IMPORTANCE_COLS = [
     "CScalls Rate",
 ]
 
+
 def load_data(train_path: str = TRAIN_PATH, test_path: str = TEST_PATH):
     """
-    Load train and test CSV files and return raw DataFrames.
-    Performs only loading + column validation.
+    Load train/test CSV files and return raw DataFrames.
     """
     X = pd.read_csv(train_path)
     y = pd.read_csv(test_path)
 
-    # Validation
     if "Churn" not in X.columns or "Churn" not in y.columns:
         raise ValueError("Missing 'Churn' column in CSV files.")
 
@@ -49,12 +48,12 @@ def load_data(train_path: str = TRAIN_PATH, test_path: str = TEST_PATH):
 
 def prepare_data(X, y):
     """
-    Full data preparation pipeline:
-    - binary encoding
-    - one-hot encoding
-    - feature engineering
-    - dropping correlated columns
-    - SMOTEENN resampling
+    Full data preparation:
+    - Encoding
+    - One-hot
+    - Feature engineering
+    - Drop correlations
+    - SMOTEENN
     """
 
     # -------- Binary encoding --------
@@ -72,7 +71,7 @@ def prepare_data(X, y):
     area_train = encoder_area.fit_transform(X[["Area code"]])
     area_test = encoder_area.transform(y[["Area code"]])
 
-    # Convert to DataFrame
+    # Convert encoded features to DataFrames
     state_train_df = pd.DataFrame(
         state_train,
         columns=encoder_state.get_feature_names_out(["State"]),
@@ -115,9 +114,11 @@ def prepare_data(X, y):
             + df["Total night charge"]
             + df["Total intl charge"]
         )
-        df["CScalls Rate"] = df["Customer service calls"] / df["Account length"]
+        df["CScalls Rate"] = (
+            df["Customer service calls"] / df["Account length"]
+        )
 
-    # -------- Drop highly correlated columns --------
+    # -------- Drop correlated columns --------
     correlated_columns = [
         "Total day minutes",
         "Total eve minutes",
@@ -136,30 +137,33 @@ def prepare_data(X, y):
     y_test = y["Churn"]
 
     # -------- SMOTEENN --------
-    smote_enn = SMOTEENN(sampling_strategy=30/70, random_state=42)
+    smote_enn = SMOTEENN(sampling_strategy=30 / 70, random_state=42)
     X_resampled, y_resampled = smote_enn.fit_resample(X_train, y_train)
 
     print("prepare_data(): preprocessing complete.")
-
-    return X_resampled, X_test, y_resampled, y_test, encoder_state, encoder_area
+    return (
+        X_resampled,
+        X_test,
+        y_resampled,
+        y_test,
+        encoder_state,
+        encoder_area,
+    )
 
 
 def train_model(X_train, y_train):
     """
-    Train XGBoost using the exact Optuna-tuned hyperparameters found in the notebook.
+    Train XGBoost using tuned hyperparameters.
     """
-    for c in XGB_IMPORTANCE_COLS:
-        if c not in X_train.columns:
-            raise ValueError(f"Missing required feature: {c}")
+    for col in XGB_IMPORTANCE_COLS:
+        if col not in X_train.columns:
+            raise ValueError(f"Missing required feature: {col}")
 
-    # Force column order exactly as in notebook
-    X_train_subset = X_train[XGB_IMPORTANCE_COLS].copy()
-    X_train_subset = X_train_subset[XGB_IMPORTANCE_COLS].astype(float)
+    X_train_subset = X_train[XGB_IMPORTANCE_COLS].astype(float)
 
     scaler = StandardScaler()
     X_train_scaled = scaler.fit_transform(X_train_subset)
 
-    # Exact tuned hyperparameters from your notebook
     model = XGBClassifier(
         n_estimators=150,
         learning_rate=0.014319674883945213,
@@ -174,19 +178,15 @@ def train_model(X_train, y_train):
 
     model.fit(X_train_scaled, y_train)
 
-    print("train_model(): training completed with Optuna parameters.")
-
+    print("train_model(): training completed.")
     return model, scaler
 
 
 def evaluate_model(model, scaler, X_test, y_test):
     """
-    Evaluate the model on the test set using accuracy, confusion matrix,
-    classification report, and ROC-AUC.
+    Evaluate model performance.
     """
-    X_test_subset = X_test[XGB_IMPORTANCE_COLS].copy()
-    X_test_subset = X_test_subset[XGB_IMPORTANCE_COLS].astype(float)
-
+    X_test_subset = X_test[XGB_IMPORTANCE_COLS].astype(float)
     X_test_scaled = scaler.transform(X_test_subset)
 
     y_pred = model.predict(X_test_scaled)

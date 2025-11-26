@@ -11,10 +11,18 @@ from model_pipeline import (
 
 
 def validate_io(X_train, X_test, y_train, y_test):
-    assert X_train is not None and X_test is not None, "X_train/X_test is None"
-    assert y_train is not None and y_test is not None, "y_train/y_test is None"
-    assert len(X_train) == len(y_train), "Training data mismatch"
-    assert len(X_test) == len(y_test), "Test data mismatch"
+    if X_train is None or X_test is None:
+        raise ValueError("X_train or X_test is None")
+
+    if y_train is None or y_test is None:
+        raise ValueError("y_train or y_test is None")
+
+    if len(X_train) != len(y_train):
+        raise ValueError("Training data mismatch")
+
+    if len(X_test) != len(y_test):
+        raise ValueError("Test data mismatch")
+
     print("IO validation passed!")
 
 
@@ -23,7 +31,7 @@ def main():
     parser.add_argument(
         "action",
         choices=["load", "prepare", "train", "evaluate", "all"],
-        help="Pipeline step to execute."
+        help="Pipeline step to execute.",
     )
     args = parser.parse_args()
 
@@ -38,28 +46,33 @@ def main():
 
         joblib.dump((X_raw, y_raw), "raw_data.pkl")
         print("Raw data saved to raw_data.pkl")
+
         if args.action == "load":
             return
-
 
     # --- PREPARE ---
     if args.action in ("prepare", "all"):
         print("Preparing data…")
 
         X_raw, y_raw = joblib.load("raw_data.pkl")
-     
-        X_train, X_test, y_train, y_test, enc_state, enc_area = prepare_data(X_raw, y_raw)
+        (
+            X_train,
+            X_test,
+            y_train,
+            y_test,
+            enc_state,
+            enc_area,
+        ) = prepare_data(X_raw, y_raw)
 
         validate_io(X_train, X_test, y_train, y_test)
 
         joblib.dump((X_train, X_test, y_train, y_test), "prepared_data.pkl")
         joblib.dump((enc_state, enc_area), "encoders.pkl")
 
-        print("prepare step done!")
+        print("Prepare step done!")
 
         if args.action == "prepare":
             return
-
 
     # --- TRAIN ---
     if args.action in ("train", "all"):
@@ -71,7 +84,7 @@ def main():
         model, scaler = train_model(X_train, y_train)
         save_model(model, scaler, enc_state, enc_area)
 
-        print("train step done!")
+        print("Train step done!")
 
         if args.action == "train":
             return
@@ -84,7 +97,7 @@ def main():
         X_train, X_test, y_train, y_test = joblib.load("prepared_data.pkl")
 
         evaluate_model(model, scaler, X_test, y_test)
-        print("evaluate step done!")
+        print("Evaluate step done!")
 
 
 if __name__ == "__main__":
