@@ -4,7 +4,7 @@
 PYTHON=python3
 ENV_NAME=venv
 REQUIREMENTS=requirements.txt
-FILES = main.py model_pipeline.py luigi_pipelines.py
+FILES = main.py model_pipeline.py
 
 # ================================
 # 1. SETUP ENVIRONMENT
@@ -17,7 +17,7 @@ setup:
 		echo "Environnement déjà existant ($(ENV_NAME))"; \
 	fi
 	@echo "Installation des dépendances..."
-	@. $(ENV_NAME)/bin/activate && pip install -r $(REQUIREMENTS)
+	@. $(ENV_NAME)/bin/activate && pip install --upgrade pip && pip install -r $(REQUIREMENTS)
 
 # ================================
 # 2. CODE QUALITY (CI)
@@ -32,7 +32,7 @@ format:
 
 security:
 	@echo "Running bandit security analysis..."
-	@. $(ENV_NAME)/bin/activate && bandit -r model_pipeline.py main.py
+	@. $(ENV_NAME)/bin/activate && bandit -r $(FILES)
 
 # ================================
 # 3. LOAD RAW CSV FILES
@@ -45,7 +45,7 @@ load:
 # 4. DATA PREPARATION
 # ================================
 prepare:
-	@echo "Préparation des données (prepare_data)..."
+	@echo "Préparation des données..."
 	@. $(ENV_NAME)/bin/activate && $(PYTHON) main.py prepare
 
 # ================================
@@ -56,7 +56,7 @@ train:
 	@. $(ENV_NAME)/bin/activate && $(PYTHON) main.py train
 
 # ================================
-# 6. EVALUATE MODEL
+# 6. EVALUATION
 # ================================
 evaluate:
 	@echo "Évaluation du modèle..."
