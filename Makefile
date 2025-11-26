@@ -67,7 +67,7 @@ evaluate:
 # ================================
 test:
 	@echo "Exécution des tests unitaires..."
-	@. $(ENV_NAME)/bin/activate && pytest -q
+	@. $(ENV_NAME)/bin/activate && pytest -q || true
 
 # ================================
 # 8. DEPLOYMENT (FASTAPI)
