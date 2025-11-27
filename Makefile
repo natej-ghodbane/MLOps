@@ -72,10 +72,13 @@ test:
 # ================================
 # 8. DEPLOYMENT (FASTAPI)
 # ================================
-deploy:
+FastAPI:
 	@echo "Lancement du serveur FastAPI..."
 	@. $(ENV_NAME)/bin/activate && uvicorn api:app --reload --host 0.0.0.0 --port 8000
 
+streamlit:
+	@echo "Lancement du serveur FastAPI..."
+	@. $(ENV_NAME)/bin/activate && streamlit run streamlit_app.py
 # ================================
 # 9. NOTEBOOK SERVER
 # ================================
