@@ -19,7 +19,7 @@ DATA_DIR = os.path.join(ROOT_DIR, "data")
 MODELS_DIR = os.path.join(ROOT_DIR, "models")
 
 TRAIN_PATH = os.path.join(DATA_DIR, "churn-bigml-80.csv")
-TEST_PATH  = os.path.join(DATA_DIR, "churn-bigml-20.csv")
+TEST_PATH = os.path.join(DATA_DIR, "churn-bigml-20.csv")
 
 # ============================================================
 # Feature subset for the model
