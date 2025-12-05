@@ -4,10 +4,14 @@
 PYTHON=python3
 ENV_NAME=venv
 REQUIREMENTS=requirements.txt
-FILES = main.py model_pipeline.py
+FILES = src/ml/main.py src/ml/model_pipeline.py src/api/api.py
 
 DOCKER_IMAGE_API = noticc/churn-api
 DOCKER_IMAGE_UI  = noticc/churn-ui
+
+MAIN_SCRIPT = src/ml/main.py
+STREAMLIT_SCRIPT = src/ui/streamlit_app.py
+API_SCRIPT = src/api/api.py
 
 # ================================
 # 1. SETUP ENVIRONMENT
@@ -42,28 +46,28 @@ security:
 # ================================
 load:
 	@echo "Chargement des CSV bruts..."
-	@. $(ENV_NAME)/bin/activate && $(PYTHON) main.py load
+	@. $(ENV_NAME)/bin/activate && $(PYTHON) $(MAIN_SCRIPT) load
 
 # ================================
 # 4. DATA PREPARATION
 # ================================
 prepare:
 	@echo "Préparation des données..."
-	@. $(ENV_NAME)/bin/activate && $(PYTHON) main.py prepare
+	@. $(ENV_NAME)/bin/activate && $(PYTHON) $(MAIN_SCRIPT) prepare
 
 # ================================
 # 5. TRAINING
 # ================================
 train:
 	@echo "Entraînement du modèle..."
-	@. $(ENV_NAME)/bin/activate && $(PYTHON) main.py train
+	@. $(ENV_NAME)/bin/activate && $(PYTHON) $(MAIN_SCRIPT) train
 
 # ================================
 # 6. EVALUATION
 # ================================
 evaluate:
 	@echo "Évaluation du modèle..."
-	@. $(ENV_NAME)/bin/activate && $(PYTHON) main.py evaluate
+	@. $(ENV_NAME)/bin/activate && $(PYTHON) $(MAIN_SCRIPT) evaluate
 
 # ================================
 # 7. TESTS
@@ -73,15 +77,15 @@ test:
 	@. $(ENV_NAME)/bin/activate && pytest -q || true
 
 # ================================
-# 8. DEPLOYMENT (FASTAPI / STREAMLIT)
+# 8. LOCAL DEVELOPMENT SERVERS
 # ================================
-FastAPI:
+api:
 	@echo "Lancement du serveur FastAPI..."
-	@. $(ENV_NAME)/bin/activate && uvicorn api:app --reload --host 0.0.0.0 --port 8000
+	@. $(ENV_NAME)/bin/activate && uvicorn src.api.api:app --reload --host 0.0.0.0 --port 8000
 
 streamlit:
 	@echo "Lancement de Streamlit..."
-	@. $(ENV_NAME)/bin/activate && streamlit run streamlit_app.py
+	@. $(ENV_NAME)/bin/activate && streamlit run $(STREAMLIT_SCRIPT)
 
 # ================================
 # 9. NOTEBOOK SERVER
@@ -96,7 +100,7 @@ notebook:
 # ================================
 all:
 	@echo "Pipeline complet (load + prepare + train + evaluate)..."
-	@. $(ENV_NAME)/bin/activate && $(PYTHON) main.py all
+	@. $(ENV_NAME)/bin/activate && $(PYTHON) $(MAIN_SCRIPT) all
 
 # ================================
 # 11. CLEAN
@@ -105,45 +109,36 @@ clean:
 	@echo "Nettoyage des fichiers temporaires..."
 	@rm -f *.pkl
 	@rm -rf __pycache__
+	@find . -type d -name "__pycache__" -exec rm -rf {} +
 
 # ================================
 # 12. DOCKER — MULTI-CONTAINERS
 # ================================
-
-# Build API image
 docker-build-api:
-	docker build -t $(DOCKER_IMAGE_API):latest -f Dockerfile.api .
+	docker build -t $(DOCKER_IMAGE_API):latest -f docker/Dockerfile.api .
 
-# Build Streamlit image
 docker-build-ui:
-	docker build -t $(DOCKER_IMAGE_UI):latest -f Dockerfile.streamlit .
+	docker build -t $(DOCKER_IMAGE_UI):latest -f docker/Dockerfile.streamlit .
 
-# Build both images
 docker-build:
 	make docker-build-api
 	make docker-build-ui
 
-# Push images to Docker Hub
 docker-push:
 	docker push $(DOCKER_IMAGE_API):latest
 	docker push $(DOCKER_IMAGE_UI):latest
 
-# Launch multi-container stack (NO BUILD)
 docker-up:
-	docker-compose up -d
+	docker compose -f docker/docker-compose.yml up -d
 
-# Stop containers
 docker-down:
-	docker-compose down
+	docker compose -f docker/docker-compose.yml down
 
-# Logs
 docker-logs:
-	docker-compose logs -f
+	docker compose -f docker/docker-compose.yml logs -f
 
-# Redeploy safely (remove old containers first)
 docker-redeploy:
-	@echo "Removing old containers if exist..."
+	@echo "Redeploying Docker infrastructure..."
 	-docker rm -f churn_api churn_ui 2>/dev/null || true
-	@echo "Starting new deployment..."
-	docker-compose down
-	docker-compose up -d
+	docker compose -f docker/docker-compose.yml down
+	docker compose -f docker/docker-compose.yml up -d --build

@@ -1,4 +1,7 @@
+import os
 import pandas as pd
+import joblib
+
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from imblearn.combine import SMOTEENN
 from xgboost import XGBClassifier
@@ -8,12 +11,22 @@ from sklearn.metrics import (
     classification_report,
     roc_auc_score,
 )
-import joblib
 
-TRAIN_PATH = "churn-bigml-80.csv"
-TEST_PATH = "churn-bigml-20.csv"
+# ============================================================
+# Resolve directories based on new structure
+# ============================================================
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ROOT_DIR = os.path.abspath(os.path.join(BASE_DIR, ".."))
 
-# Feature subset extracted from notebook XGB_importances_column
+DATA_DIR = os.path.join(ROOT_DIR, "data")
+MODELS_DIR = os.path.join(ROOT_DIR, "models")
+
+TRAIN_PATH = os.path.join(DATA_DIR, "churn-bigml-80.csv")
+TEST_PATH = os.path.join(DATA_DIR, "churn-bigml-20.csv")
+
+# ============================================================
+# Feature subset for the model
+# ============================================================
 XGB_IMPORTANCE_COLS = [
     "Total charge",
     "Area code_415",
@@ -32,10 +45,10 @@ XGB_IMPORTANCE_COLS = [
 ]
 
 
+# ============================================================
+# Load train & test CSV
+# ============================================================
 def load_data(train_path: str = TRAIN_PATH, test_path: str = TEST_PATH):
-    """
-    Load train/test CSV files and return raw DataFrames.
-    """
     X = pd.read_csv(train_path)
     y = pd.read_csv(test_path)
 
@@ -46,14 +59,17 @@ def load_data(train_path: str = TRAIN_PATH, test_path: str = TEST_PATH):
     return X, y
 
 
+# ============================================================
+# Data Preparation
+# ============================================================
 def prepare_data(X, y):
     """
     Full data preparation:
-    - Encoding
-    - One-hot
+    - Binary encoding
+    - OneHot encoding (State, Area code)
     - Feature engineering
-    - Drop correlations
-    - SMOTEENN
+    - Drop correlated features
+    - SMOTEENN balancing
     """
 
     # -------- Binary encoding --------
@@ -65,38 +81,34 @@ def prepare_data(X, y):
     encoder_state = OneHotEncoder(sparse_output=False, handle_unknown="ignore")
     encoder_area = OneHotEncoder(sparse_output=False, handle_unknown="ignore")
 
+    # Train dataset OHE
     state_train = encoder_state.fit_transform(X[["State"]])
-    state_test = encoder_state.transform(y[["State"]])
-
     area_train = encoder_area.fit_transform(X[["Area code"]])
+
+    # Test dataset OHE
+    state_test = encoder_state.transform(y[["State"]])
     area_test = encoder_area.transform(y[["Area code"]])
 
-    # Convert encoded features to DataFrames
+    # Convert encoded features
     state_train_df = pd.DataFrame(
-        state_train,
-        columns=encoder_state.get_feature_names_out(["State"]),
-        index=X.index,
-    )
-    state_test_df = pd.DataFrame(
-        state_test,
-        columns=encoder_state.get_feature_names_out(["State"]),
-        index=y.index,
+        state_train, columns=encoder_state.get_feature_names_out(["State"]), index=X.index
     )
     area_train_df = pd.DataFrame(
-        area_train,
-        columns=encoder_area.get_feature_names_out(["Area code"]),
-        index=X.index,
-    )
-    area_test_df = pd.DataFrame(
-        area_test,
-        columns=encoder_area.get_feature_names_out(["Area code"]),
-        index=y.index,
+        area_train, columns=encoder_area.get_feature_names_out(["Area code"]), index=X.index
     )
 
-    # Replace categorical with encoded
+    state_test_df = pd.DataFrame(
+        state_test, columns=encoder_state.get_feature_names_out(["State"]), index=y.index
+    )
+    area_test_df = pd.DataFrame(
+        area_test, columns=encoder_area.get_feature_names_out(["Area code"]), index=y.index
+    )
+
+    # Drop original categorical columns
     X = X.drop(["State", "Area code"], axis=1)
     y = y.drop(["State", "Area code"], axis=1)
 
+    # Merge new encoded features
     X = pd.concat([X, state_train_df, area_train_df], axis=1)
     y = pd.concat([y, state_test_df, area_test_df], axis=1)
 
@@ -114,47 +126,38 @@ def prepare_data(X, y):
             + df["Total night charge"]
             + df["Total intl charge"]
         )
-        df["CScalls Rate"] = (
-            df["Customer service calls"] / df["Account length"]
-        )
+        df["CScalls Rate"] = df["Customer service calls"] / df["Account length"]
 
     # -------- Drop correlated columns --------
-    correlated_columns = [
+    correlated_cols = [
         "Total day minutes",
         "Total eve minutes",
         "Total night minutes",
         "Total intl minutes",
         "Voice mail plan",
     ]
-    X = X.drop(correlated_columns, axis=1)
-    y = y.drop(correlated_columns, axis=1)
+    X = X.drop(correlated_cols, axis=1)
+    y = y.drop(correlated_cols, axis=1)
 
-    # -------- Split X/y --------
+    # Split
     X_train = X.drop("Churn", axis=1)
     y_train = X["Churn"]
-
     X_test = y.drop("Churn", axis=1)
     y_test = y["Churn"]
 
     # -------- SMOTEENN --------
-    smote_enn = SMOTEENN(sampling_strategy=30 / 70, random_state=42)
+    smote_enn = SMOTEENN(sampling_strategy=30/70, random_state=42)
     X_resampled, y_resampled = smote_enn.fit_resample(X_train, y_train)
 
     print("prepare_data(): preprocessing complete.")
-    return (
-        X_resampled,
-        X_test,
-        y_resampled,
-        y_test,
-        encoder_state,
-        encoder_area,
-    )
+    return X_resampled, X_test, y_resampled, y_test, encoder_state, encoder_area
 
 
+# ============================================================
+# Train XGBoost
+# ============================================================
 def train_model(X_train, y_train):
-    """
-    Train XGBoost using tuned hyperparameters.
-    """
+
     for col in XGB_IMPORTANCE_COLS:
         if col not in X_train.columns:
             raise ValueError(f"Missing required feature: {col}")
@@ -166,12 +169,12 @@ def train_model(X_train, y_train):
 
     model = XGBClassifier(
         n_estimators=150,
-        learning_rate=0.014319674883945213,
+        learning_rate=0.0143,
         max_depth=10,
         min_child_weight=3,
-        subsample=0.9993815446215235,
-        colsample_bytree=0.9185894728369491,
-        gamma=1.9937854420882333,
+        subsample=0.9993,
+        colsample_bytree=0.9186,
+        gamma=1.99,
         random_state=42,
         eval_metric="logloss",
     )
@@ -182,10 +185,11 @@ def train_model(X_train, y_train):
     return model, scaler
 
 
+# ============================================================
+# Evaluate model
+# ============================================================
 def evaluate_model(model, scaler, X_test, y_test):
-    """
-    Evaluate model performance.
-    """
+
     X_test_subset = X_test[XGB_IMPORTANCE_COLS].astype(float)
     X_test_scaled = scaler.transform(X_test_subset)
 
@@ -195,33 +199,45 @@ def evaluate_model(model, scaler, X_test, y_test):
     acc = accuracy_score(y_test, y_pred)
     cm = confusion_matrix(y_test, y_pred)
     report = classification_report(y_test, y_pred)
-    roc_auc = roc_auc_score(y_test, y_proba)
+    auc = roc_auc_score(y_test, y_proba)
 
+    print("\nEvaluation Results")
     print("Accuracy:", acc)
     print("Confusion matrix:\n", cm)
     print("Classification report:\n", report)
-    print("ROC-AUC:", roc_auc)
+    print("ROC-AUC:", auc)
 
     return {
         "accuracy": acc,
         "confusion_matrix": cm,
         "classification_report": report,
-        "roc_auc": roc_auc,
+        "roc_auc": auc,
     }
 
 
-def save_model(model, scaler, encoder_state, encoder_area, prefix="churn"):
+# ============================================================
+# Save & Load model artefacts
+# ============================================================
+def save_model(model, scaler, encoder_state, encoder_area, prefix=None):
+
+    prefix = prefix or os.path.join(MODELS_DIR, "churn")
+
     joblib.dump(model, f"{prefix}_model.pkl")
     joblib.dump(scaler, f"{prefix}_scaler.pkl")
     joblib.dump(encoder_state, f"{prefix}_encoder_state.pkl")
     joblib.dump(encoder_area, f"{prefix}_encoder_area.pkl")
-    print("Model and preprocessors saved.")
+
+    print(f"Model & encoders saved in: {MODELS_DIR}")
 
 
-def load_model(prefix="churn"):
+def load_model(prefix=None):
+
+    prefix = prefix or os.path.join(MODELS_DIR, "churn")
+
     model = joblib.load(f"{prefix}_model.pkl")
     scaler = joblib.load(f"{prefix}_scaler.pkl")
-    encoder_state = joblib.load(f"{prefix}_encoder_state.pkl")
-    encoder_area = joblib.load(f"{prefix}_encoder_area.pkl")
+    enc_state = joblib.load(f"{prefix}_encoder_state.pkl")
+    enc_area = joblib.load(f"{prefix}_encoder_area.pkl")
+
     print("Model and preprocessors loaded.")
-    return model, scaler, encoder_state, encoder_area
+    return model, scaler, enc_state, enc_area

@@ -2,15 +2,25 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
+*.pyd
+*.whl
+*.egg-info/
+dist/
+build/
 
 venv/
 .env/
+.env.local
+*.env
 
 .ipynb_checkpoints/
 
-*.pkl
-*.joblib
-*.sav
+models/*.pkl
+models/*.joblib
+models/*.sav
+
+artifacts/*.pkl
+artifacts/*.joblib
 
 mlruns/
 mlartifacts/
@@ -21,7 +31,21 @@ mlartifacts/
 Thumbs.db
 
 *.pid
-.vscode/
 
-*.env
-.env.local
+.vscode/
+.idea/
+
+**/.dockerignore
+docker/*.log
+
+**/docker-compose.override.yml
+**/docker-compose.local.yml
+
+*.jenkins*
+/workspace/
+*.tmp
+
+.streamlit/
+
+*.bak
+*.tmp
