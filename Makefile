@@ -128,9 +128,9 @@ docker-push:
 	docker push $(DOCKER_IMAGE_API):latest
 	docker push $(DOCKER_IMAGE_UI):latest
 
-# Launch multi-container stack
+# Launch multi-container stack (NO BUILD)
 docker-up:
-	docker-compose up -d --build
+	docker-compose up -d
 
 # Stop containers
 docker-down:
@@ -140,7 +140,10 @@ docker-down:
 docker-logs:
 	docker-compose logs -f
 
-# Rebuild & redeploy
+# Redeploy safely (remove old containers first)
 docker-redeploy:
+	@echo "Removing old containers if exist..."
+	-docker rm -f churn_api churn_ui 2>/dev/null || true
+	@echo "Starting new deployment..."
 	docker-compose down
-	docker-compose up -d --build
+	docker-compose up -d
