@@ -17,7 +17,7 @@ ROOT_DIR = os.path.abspath(os.path.join(BASE_DIR, "..", ".."))
 
 DATA_DIR = os.path.join(ROOT_DIR, "data")
 MODELS_DIR = os.path.join(ROOT_DIR, "models")
-
+os.makedirs(MODELS_DIR, exist_ok=True)
 TRAIN_PATH = os.path.join(DATA_DIR, "churn-bigml-80.csv")
 TEST_PATH = os.path.join(DATA_DIR, "churn-bigml-20.csv")
 
