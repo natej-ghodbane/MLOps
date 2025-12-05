@@ -12,17 +12,14 @@ from sklearn.metrics import (
     roc_auc_score,
 )
 
-# ============================================================
-# Resolve directories based on new structure
-# ============================================================
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-ROOT_DIR = os.path.abspath(os.path.join(BASE_DIR, ".."))
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+ROOT_DIR = os.path.abspath(os.path.join(BASE_DIR, "..", ".."))
 
 DATA_DIR = os.path.join(ROOT_DIR, "data")
 MODELS_DIR = os.path.join(ROOT_DIR, "models")
 
 TRAIN_PATH = os.path.join(DATA_DIR, "churn-bigml-80.csv")
-TEST_PATH = os.path.join(DATA_DIR, "churn-bigml-20.csv")
+TEST_PATH  = os.path.join(DATA_DIR, "churn-bigml-20.csv")
 
 # ============================================================
 # Feature subset for the model

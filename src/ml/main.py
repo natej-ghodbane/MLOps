@@ -11,14 +11,10 @@ from src.ml.model_pipeline import (
     load_model,
 )
 
-
-# ============================================================
-# Directories (adapted to new structure)
-# ============================================================
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
-DATA_DIR = os.path.join(BASE_DIR, "..", "..", "data")
-MODELS_DIR = os.path.join(BASE_DIR, "..", "..", "models")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+ROOT_DIR = os.path.abspath(os.path.join(BASE_DIR, "..", ".."))
+DATA_DIR = os.path.join(ROOT_DIR, "data")
+MODELS_DIR = os.path.join(ROOT_DIR, "models")
 
 RAW_DATA_PATH = os.path.join(MODELS_DIR, "raw_data.pkl")
 PREPARED_DATA_PATH = os.path.join(MODELS_DIR, "prepared_data.pkl")
