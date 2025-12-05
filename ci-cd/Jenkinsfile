@@ -5,6 +5,7 @@ pipeline {
         DOCKERHUB_CRED = 'dockerhub_cred'
         IMAGE_API = 'noticc/churn-api'
         IMAGE_UI  = 'noticc/churn-ui'
+        PYTHONPATH = "${WORKSPACE}"
     }
 
     stages {
