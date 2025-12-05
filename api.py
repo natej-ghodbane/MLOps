@@ -55,7 +55,7 @@ def root():
 # ======================================================
 @app.post("/predict")
 def predict(features: dict):
-    df = pd.DataFrame([features])
+    df = pd.DataFrame([features])   
     df = df[XGB_IMPORTANCE_COLS]  # enforce order
     df_scaled = scaler.transform(df)
 
