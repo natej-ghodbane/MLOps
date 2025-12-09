@@ -33,7 +33,6 @@ This project implements a **full end-to-end MLOps workflow** for a churn predict
 ✔ Fully automated ML pipeline (load → prepare → train → evaluate)  
 ✔ Model artefact saving (model + scaler + encoders)  
 ✔ REST API using FastAPI
-
 ✔ User interface using Streamlit  
 ✔ Dockerized multi‑service deployment  
 ✔ Jenkins CI/CD:  
