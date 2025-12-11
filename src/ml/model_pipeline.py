@@ -1,8 +1,6 @@
 import os
 import pandas as pd
 import joblib
-import mlflow
-import mlflow.sklearn
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from imblearn.combine import SMOTEENN
 from xgboost import XGBClassifier
@@ -156,50 +154,31 @@ def prepare_data(X, y):
 # ============================================================
 def train_model(X_train, y_train):
 
-    mlflow.set_experiment("ChurnPrediction")
+    for col in XGB_IMPORTANCE_COLS:
+        if col not in X_train.columns:
+            raise ValueError(f"Missing required feature: {col}")
 
-    with mlflow.start_run():
+    X_train_subset = X_train[XGB_IMPORTANCE_COLS].astype(float)
 
-        # ============= FEATURE CHECK =============
-        for col in XGB_IMPORTANCE_COLS:
-            if col not in X_train.columns:
-                raise ValueError(f"Missing required feature: {col}")
+    scaler = StandardScaler()
+    X_train_scaled = scaler.fit_transform(X_train_subset)
 
-        X_train_subset = X_train[XGB_IMPORTANCE_COLS].astype(float)
+    model = XGBClassifier(
+        n_estimators=150,
+        learning_rate=0.0143,
+        max_depth=10,
+        min_child_weight=3,
+        subsample=0.9993,
+        colsample_bytree=0.9186,
+        gamma=1.99,
+        random_state=42,
+        eval_metric="logloss",
+    )
 
-        scaler = StandardScaler()
-        X_train_scaled = scaler.fit_transform(X_train_subset)
+    model.fit(X_train_scaled, y_train)
 
-        # Hyperparameters
-        params = {
-            "n_estimators": 150,
-            "learning_rate": 0.0143,
-            "max_depth": 10,
-            "min_child_weight": 3,
-            "subsample": 0.9993,
-            "colsample_bytree": 0.9186,
-            "gamma": 1.99,
-        }
-
-        # Log parameters
-        mlflow.log_params(params)
-
-        model = XGBClassifier(
-            **params,
-            random_state=42,
-            eval_metric="logloss",
-        )
-
-        model.fit(X_train_scaled, y_train)
-
-        # Log model
-        mlflow.sklearn.log_model(model, "model")
-
-        print("train_model(): training completed.")
-
-        return model, scaler
-
-
+    print("train_model(): training completed.")
+    return model, scaler
 
 # ============================================================
 # Evaluate model
@@ -222,16 +201,12 @@ def evaluate_model(model, scaler, X_test, y_test):
     print("Confusion matrix:\n", cm)
     print("Classification report:\n", report)
     print("ROC-AUC:", auc)
-    
-    mlflow.log_metric("accuracy", acc)
-    mlflow.log_metric("roc_auc", auc)
     return {
         "accuracy": acc,
         "confusion_matrix": cm,
         "classification_report": report,
         "roc_auc": auc,
     }
-
 
 # ============================================================
 # Save & Load model artefacts
@@ -246,7 +221,6 @@ def save_model(model, scaler, encoder_state, encoder_area, prefix=None):
     joblib.dump(encoder_area, f"{prefix}_encoder_area.pkl")
 
     print(f"Model & encoders saved in: {MODELS_DIR}")
-
 
 def load_model(prefix=None):
 
