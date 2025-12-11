@@ -1,6 +1,7 @@
 import os
 import pandas as pd
 import joblib
+
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from imblearn.combine import SMOTEENN
 from xgboost import XGBClassifier
@@ -11,14 +12,17 @@ from sklearn.metrics import (
     roc_auc_score,
 )
 
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.abspath(os.path.join(BASE_DIR, "..", ".."))
 
 DATA_DIR = os.path.join(ROOT_DIR, "data")
 MODELS_DIR = os.path.join(ROOT_DIR, "models")
 os.makedirs(MODELS_DIR, exist_ok=True)
+
 TRAIN_PATH = os.path.join(DATA_DIR, "churn-bigml-80.csv")
 TEST_PATH = os.path.join(DATA_DIR, "churn-bigml-20.csv")
+
 
 # ============================================================
 # Feature subset for the model
@@ -142,7 +146,7 @@ def prepare_data(X, y):
     y_test = y["Churn"]
 
     # -------- SMOTEENN --------
-    smote_enn = SMOTEENN(sampling_strategy=30/70, random_state=42)
+    smote_enn = SMOTEENN(sampling_strategy=30 / 70, random_state=42)
     X_resampled, y_resampled = smote_enn.fit_resample(X_train, y_train)
 
     print("prepare_data(): preprocessing complete.")
@@ -180,6 +184,7 @@ def train_model(X_train, y_train):
     print("train_model(): training completed.")
     return model, scaler
 
+
 # ============================================================
 # Evaluate model
 # ============================================================
@@ -201,12 +206,14 @@ def evaluate_model(model, scaler, X_test, y_test):
     print("Confusion matrix:\n", cm)
     print("Classification report:\n", report)
     print("ROC-AUC:", auc)
+
     return {
         "accuracy": acc,
         "confusion_matrix": cm,
         "classification_report": report,
         "roc_auc": auc,
     }
+
 
 # ============================================================
 # Save & Load model artefacts
@@ -221,6 +228,7 @@ def save_model(model, scaler, encoder_state, encoder_area, prefix=None):
     joblib.dump(encoder_area, f"{prefix}_encoder_area.pkl")
 
     print(f"Model & encoders saved in: {MODELS_DIR}")
+
 
 def load_model(prefix=None):
 
