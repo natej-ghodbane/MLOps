@@ -3,6 +3,8 @@ from fastapi import FastAPI
 import joblib
 import pandas as pd
 from xgboost import XGBClassifier
+import mlflow
+import mlflow.sklearn
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from pydantic import BaseModel
 
