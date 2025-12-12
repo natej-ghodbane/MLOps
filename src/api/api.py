@@ -93,74 +93,60 @@ def predict(features: dict):
 def retrain(hyperparams: HyperParams):
     global model, scaler, enc_state, enc_area
 
-    # Load full training dataset
-    df = pd.read_csv(TRAIN_PATH)
+    with mlflow.start_run(run_name="API_Retrain"):
 
-    # ---------------------------------------------
-    # 0. Feature engineering (same as pipeline)
-    # ---------------------------------------------
-    df["Total charge"] = (
-        df["Total day charge"]
-        + df["Total eve charge"]
-        + df["Total night charge"]
-        + df["Total intl charge"]
-    )
-    df["CScalls Rate"] = df["Customer service calls"] / (df["Total day calls"] + 1)
+        mlflow.log_params(hyperparams.dict())
 
-    df["International plan"] = (
-        df["International plan"]
-        .astype(str)
-        .str.lower()
-        .map({"yes": 1, "no": 0})
-        .fillna(0)
-    )
+        df = pd.read_csv(TRAIN_PATH)
 
-    # ---------------------------------------------
-    # 1. Fit new encoders
-    # ---------------------------------------------
-    enc_state = OneHotEncoder(sparse_output=False, handle_unknown="ignore")
-    enc_area = OneHotEncoder(sparse_output=False, handle_unknown="ignore")
+        df["Total charge"] = (
+            df["Total day charge"]
+            + df["Total eve charge"]
+            + df["Total night charge"]
+            + df["Total intl charge"]
+        )
+        df["CScalls Rate"] = df["Customer service calls"] / (df["Total day calls"] + 1)
 
-    df_state = enc_state.fit_transform(df[["State"]])
-    df_area = enc_area.fit_transform(df[["Area code"]])
+        df["International plan"] = (
+            df["International plan"]
+            .astype(str)
+            .str.lower()
+            .map({"yes": 1, "no": 0})
+            .fillna(0)
+        )
 
-    df[enc_state.get_feature_names_out(["State"])] = df_state
-    df[enc_area.get_feature_names_out(["Area code"])] = df_area
+        enc_state = OneHotEncoder(sparse_output=False, handle_unknown="ignore")
+        enc_area = OneHotEncoder(sparse_output=False, handle_unknown="ignore")
 
-    # ---------------------------------------------
-    # 2. Select X & y
-    # ---------------------------------------------
-    X = df[XGB_IMPORTANCE_COLS]
-    y = df["Churn"].astype(int)
+        df_state = enc_state.fit_transform(df[["State"]])
+        df_area = enc_area.fit_transform(df[["Area code"]])
 
-    # ---------------------------------------------
-    # 3. Standard scaling
-    # ---------------------------------------------
-    scaler = StandardScaler()
-    X_scaled = scaler.fit_transform(X)
+        df[enc_state.get_feature_names_out(["State"])] = df_state
+        df[enc_area.get_feature_names_out(["Area code"])] = df_area
 
-    # ---------------------------------------------
-    # 4. Train new model
-    # ---------------------------------------------
-    new_model = XGBClassifier(
-        **hyperparams.dict(),
-        eval_metric="logloss"
-    )
-    new_model.fit(X_scaled, y)
+        X = df[XGB_IMPORTANCE_COLS]
+        y = df["Churn"].astype(int)
 
-    # ---------------------------------------------
-    # 5. Save new artefacts
-    # ---------------------------------------------
-    joblib.dump(new_model, MODEL_PATH)
-    joblib.dump(scaler, SCALER_PATH)
-    joblib.dump(enc_state, ENC_STATE_PATH)
-    joblib.dump(enc_area, ENC_AREA_PATH)
+        scaler = StandardScaler()
+        X_scaled = scaler.fit_transform(X)
 
-    # Hot-reload in memory
-    model = new_model
+        new_model = XGBClassifier(
+            **hyperparams.dict(),
+            eval_metric="logloss"
+        )
+        new_model.fit(X_scaled, y)
+
+        mlflow.sklearn.log_model(new_model, "model")
+
+        joblib.dump(new_model, MODEL_PATH)
+        joblib.dump(scaler, SCALER_PATH)
+        joblib.dump(enc_state, ENC_STATE_PATH)
+        joblib.dump(enc_area, ENC_AREA_PATH)
+
+        model = new_model
 
     return {
         "status": "success",
-        "message": "Model retrained successfully ✔",
+        "message": "Model retrained and logged in MLflow ✔",
         "used_hyperparameters": hyperparams,
     }

@@ -169,32 +169,31 @@ def train_model(X_train, y_train):
     scaler = StandardScaler()
     X_train_scaled = scaler.fit_transform(X_train_subset)
 
-    with mlflow.start_run(run_name="XGBoost_Churn_Model"):
+    params = {
+        "n_estimators": 150,
+        "learning_rate": 0.0143,
+        "max_depth": 10,
+        "min_child_weight": 3,
+        "subsample": 0.9993,
+        "colsample_bytree": 0.9186,
+        "gamma": 1.99,
+    }
 
-        params = {
-            "n_estimators": 150,
-            "learning_rate": 0.0143,
-            "max_depth": 10,
-            "min_child_weight": 3,
-            "subsample": 0.9993,
-            "colsample_bytree": 0.9186,
-            "gamma": 1.99,
-        }
+    # 🔹 log params here (NO start_run)
+    mlflow.log_params(params)
 
-        mlflow.log_params(params)
+    model = XGBClassifier(
+        **params,
+        random_state=42,
+        eval_metric="logloss",
+    )
 
-        model = XGBClassifier(
-            **params,
-            random_state=42,
-            eval_metric="logloss",
-        )
+    model.fit(X_train_scaled, y_train)
 
-        model.fit(X_train_scaled, y_train)
+    # 🔹 log model here
+    mlflow.sklearn.log_model(model, artifact_path="model")
 
-        # Log model artifact
-        mlflow.sklearn.log_model(model, artifact_path="model")
-
-    print("train_model(): training completed with MLflow.")
+    print("train_model(): training completed.")
     return model, scaler
 
 
