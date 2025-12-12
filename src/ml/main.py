@@ -1,6 +1,7 @@
 import argparse
 import os
 import joblib
+import mlflow
 
 from src.ml.model_pipeline import (
     load_data,
@@ -20,7 +21,7 @@ RAW_DATA_PATH = os.path.join(MODELS_DIR, "raw_data.pkl")
 PREPARED_DATA_PATH = os.path.join(MODELS_DIR, "prepared_data.pkl")
 ENCODERS_PATH = os.path.join(MODELS_DIR, "encoders.pkl")
 
-
+mlflow.set_experiment("Churn_Prediction_Experiment")
 # ============================================================
 # Validation Helper
 # ============================================================
@@ -107,11 +108,13 @@ def main():
     if args.action in ("train", "all"):
         print("Training model…")
 
-        X_train, X_test, y_train, y_test = joblib.load(PREPARED_DATA_PATH)
-        enc_state, enc_area = joblib.load(ENCODERS_PATH)
+        with mlflow.start_run(run_name="CLI_Training"):
 
-        model, scaler = train_model(X_train, y_train)
-        save_model(model, scaler, enc_state, enc_area, prefix=os.path.join(MODELS_DIR, "churn"))
+            X_train, X_test, y_train, y_test = joblib.load(PREPARED_DATA_PATH)
+            enc_state, enc_area = joblib.load(ENCODERS_PATH)
+
+            model, scaler = train_model(X_train, y_train)
+            save_model(model, scaler, enc_state, enc_area, prefix=os.path.join(MODELS_DIR, "churn"))
 
         print("Train step done!")
 
@@ -124,10 +127,13 @@ def main():
     if args.action in ("evaluate", "all"):
         print("Evaluating model…")
 
-        model, scaler, enc_state, enc_area = load_model(prefix=os.path.join(MODELS_DIR, "churn"))
-        X_train, X_test, y_train, y_test = joblib.load(PREPARED_DATA_PATH)
+        with mlflow.start_run(run_name="CLI_Evaluation"):
 
-        evaluate_model(model, scaler, X_test, y_test)
+            model, scaler, enc_state, enc_area = load_model(prefix=os.path.join(MODELS_DIR, "churn"))
+            X_train, X_test, y_train, y_test = joblib.load(PREPARED_DATA_PATH)
+
+            evaluate_model(model, scaler, X_test, y_test)
+
         print("Evaluate step done!")
 
 

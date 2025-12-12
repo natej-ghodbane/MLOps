@@ -1,6 +1,8 @@
 import os
 import pandas as pd
 import joblib
+import mlflow
+import mlflow.sklearn
 
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from imblearn.combine import SMOTEENN
@@ -167,21 +169,32 @@ def train_model(X_train, y_train):
     scaler = StandardScaler()
     X_train_scaled = scaler.fit_transform(X_train_subset)
 
-    model = XGBClassifier(
-        n_estimators=150,
-        learning_rate=0.0143,
-        max_depth=10,
-        min_child_weight=3,
-        subsample=0.9993,
-        colsample_bytree=0.9186,
-        gamma=1.99,
-        random_state=42,
-        eval_metric="logloss",
-    )
+    with mlflow.start_run(run_name="XGBoost_Churn_Model"):
 
-    model.fit(X_train_scaled, y_train)
+        params = {
+            "n_estimators": 150,
+            "learning_rate": 0.0143,
+            "max_depth": 10,
+            "min_child_weight": 3,
+            "subsample": 0.9993,
+            "colsample_bytree": 0.9186,
+            "gamma": 1.99,
+        }
 
-    print("train_model(): training completed.")
+        mlflow.log_params(params)
+
+        model = XGBClassifier(
+            **params,
+            random_state=42,
+            eval_metric="logloss",
+        )
+
+        model.fit(X_train_scaled, y_train)
+
+        # Log model artifact
+        mlflow.sklearn.log_model(model, artifact_path="model")
+
+    print("train_model(): training completed with MLflow.")
     return model, scaler
 
 
@@ -206,6 +219,9 @@ def evaluate_model(model, scaler, X_test, y_test):
     print("Confusion matrix:\n", cm)
     print("Classification report:\n", report)
     print("ROC-AUC:", auc)
+
+    mlflow.log_metric("accuracy", acc)
+    mlflow.log_metric("roc_auc", auc)
 
     return {
         "accuracy": acc,

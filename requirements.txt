@@ -20,4 +20,3 @@ altair
 pydeck
 watchdog
 streamlit
-mlflow
