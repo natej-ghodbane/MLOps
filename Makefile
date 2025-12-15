@@ -9,6 +9,7 @@ FILES = src/ml/main.py src/ml/model_pipeline.py src/api/api.py
 
 DOCKER_IMAGE_API = noticc/churn-api
 DOCKER_IMAGE_UI  = noticc/churn-ui
+DOCKER_IMAGE_MLFLOW = noticc/mlflow
 
 # ================================
 # 1. SETUP ENVIRONMENT
@@ -101,7 +102,7 @@ all:
 # ================================
 # 11. MLflow
 # ================================
-mlflow-ui:
+mlflow-ui-local:
 	@echo "Lancement de MLflow UI avec SQLite backend..."
 	@. $(ENV_NAME)/bin/activate && mlflow ui \
 		--backend-store-uri sqlite:///mlflow.db \
@@ -129,9 +130,13 @@ docker-build-api:
 docker-build-ui:
 	docker build -t $(DOCKER_IMAGE_UI):latest -f docker/Dockerfile.streamlit .
 
+docker-build-mlflow:
+	docker build -t $(DOCKER_IMAGE_MLFLOW):latest -f docker/Dockerfile.mlflow .
+
 docker-build:
 	make docker-build-api
 	make docker-build-ui
+	make docker-build-mlflow
 
 docker-push:
 	docker push $(DOCKER_IMAGE_API):latest

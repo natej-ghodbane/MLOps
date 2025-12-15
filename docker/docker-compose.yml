@@ -1,6 +1,19 @@
 version: "3.9"
 
 services:
+  mlflow:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.mlflow
+    image: noticc/mlflow:latest
+    container_name: mlflow
+    ports:
+      - "5000:5000"
+    volumes:
+      - mlflow_data:/mlflow
+    networks:
+      - churn-net
+
   api:
     build:
       context: ..
@@ -33,3 +46,6 @@ services:
 networks:
   churn-net:
     driver: bridge
+
+volumes:
+  mlflow_data:
