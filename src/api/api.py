@@ -95,6 +95,8 @@ def predict(features: dict):
 def retrain(hyperparams: HyperParams):
     global model, scaler, enc_state, enc_area
 
+    mlflow.set_tracking_uri("http://host.docker.internal:5000")
+    mlflow.set_experiment("Churn_Retrain_API")
     with mlflow.start_run(run_name="API_Retrain"):
 
         mlflow.log_params(hyperparams.dict())

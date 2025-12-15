@@ -73,7 +73,7 @@ with st.form("prediction_form"):
         }
 
         try:
-            resp = requests.post(f"{API_URL}/predict", json=features, timeout=5)
+            resp = requests.post(f"{API_URL}/predict", json=features, timeout=300)
             resp.raise_for_status()
 
             result = resp.json()
