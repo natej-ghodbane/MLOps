@@ -8,6 +8,14 @@ import mlflow.sklearn
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from pydantic import BaseModel
 
+
+from src.ml.model_pipeline import (
+    prepare_data,
+    train_model,
+    evaluate_model,
+    save_model,
+)
+
 app = FastAPI(title="Churn Prediction API")
 
 # =====================================================
@@ -44,6 +52,12 @@ class HyperParams(BaseModel):
     learning_rate: float
 
 
+class TrainAllResponse(BaseModel):
+    accuracy: float
+    roc_auc: float
+    message: str
+
+
 # =====================================================
 # Columns required for prediction
 # =====================================================
@@ -68,6 +82,78 @@ XGB_IMPORTANCE_COLS = [
 @app.get("/")
 def root():
     return {"message": "Churn Prediction API running ✔"}
+
+
+# =====================================================
+# TRAIN ALL ENDPOINT
+# =====================================================
+@app.post("/train-all", response_model=TrainAllResponse)
+def train_all():
+    global model, scaler, enc_state, enc_area
+
+    # ------------------------------
+    # MLflow (Docker)
+    # ------------------------------
+    mlflow.set_tracking_uri("http://mlflow:5000")
+    mlflow.set_experiment("Churn_API_Full_Pipeline")
+
+    with mlflow.start_run(run_name="API_Train_All"):
+
+        # ------------------------------
+        # LOAD DATA
+        # ------------------------------
+        X_raw = pd.read_csv(TRAIN_PATH)
+        y_raw = pd.read_csv(TRAIN_PATH)  # same file, split inside prepare
+
+        # ------------------------------
+        # PREPARE DATA
+        # ------------------------------
+        (
+            X_train,
+            X_test,
+            y_train,
+            y_test,
+            enc_state,
+            enc_area,
+        ) = prepare_data(X_raw, y_raw)
+
+        # ------------------------------
+        # TRAIN
+        # ------------------------------
+        model, scaler, params = train_model(X_train, y_train)
+        mlflow.log_params(params)
+
+        # ------------------------------
+        # EVALUATE
+        # ------------------------------
+        metrics = evaluate_model(model, scaler, X_test, y_test)
+        mlflow.log_metrics(metrics)
+
+        # ------------------------------
+        # LOG MODEL
+        # ------------------------------
+        mlflow.sklearn.log_model(
+            model,
+            name="model",
+            input_example=X_train.head(5),
+        )
+
+        # ------------------------------
+        # SAVE ARTIFACTS
+        # ------------------------------
+        save_model(
+            model,
+            scaler,
+            enc_state,
+            enc_area,
+            prefix=os.path.join(MODELS_DIR, "churn"),
+        )
+
+    return {
+        "message": "Full training pipeline executed successfully",
+        "accuracy": metrics["accuracy"],
+        "roc_auc": metrics["roc_auc"],
+    }
 
 
 # =====================================================
@@ -134,10 +220,7 @@ def retrain(hyperparams: HyperParams):
         scaler = StandardScaler()
         X_scaled = scaler.fit_transform(X)
 
-        new_model = XGBClassifier(
-            **hyperparams.dict(),
-            eval_metric="logloss"
-        )
+        new_model = XGBClassifier(**hyperparams.dict(), eval_metric="logloss")
         new_model.fit(X_scaled, y)
 
         mlflow.sklearn.log_model(new_model, "model")

@@ -21,16 +21,16 @@ pipeline {
                 sh 'make setup'
             }
         }
+                
+        stage('Format') {
+            steps {
+                sh 'make format'
+            }
+        }
 
         stage('Lint') {
             steps {
                 sh 'make lint'
-            }
-        }
-
-        stage('Format') {
-            steps {
-                sh 'make format'
             }
         }
 

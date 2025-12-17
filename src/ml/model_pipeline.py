@@ -1,18 +1,11 @@
 import os
 import pandas as pd
 import joblib
-import mlflow
-import mlflow.sklearn
 
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from imblearn.combine import SMOTEENN
 from xgboost import XGBClassifier
-from sklearn.metrics import (
-    accuracy_score,
-    confusion_matrix,
-    classification_report,
-    roc_auc_score,
-)
+from sklearn.metrics import accuracy_score, roc_auc_score
 
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -93,17 +86,25 @@ def prepare_data(X, y):
 
     # Convert encoded features
     state_train_df = pd.DataFrame(
-        state_train, columns=encoder_state.get_feature_names_out(["State"]), index=X.index
+        state_train,
+        columns=encoder_state.get_feature_names_out(["State"]),
+        index=X.index,
     )
     area_train_df = pd.DataFrame(
-        area_train, columns=encoder_area.get_feature_names_out(["Area code"]), index=X.index
+        area_train,
+        columns=encoder_area.get_feature_names_out(["Area code"]),
+        index=X.index,
     )
 
     state_test_df = pd.DataFrame(
-        state_test, columns=encoder_state.get_feature_names_out(["State"]), index=y.index
+        state_test,
+        columns=encoder_state.get_feature_names_out(["State"]),
+        index=y.index,
     )
     area_test_df = pd.DataFrame(
-        area_test, columns=encoder_area.get_feature_names_out(["Area code"]), index=y.index
+        area_test,
+        columns=encoder_area.get_feature_names_out(["Area code"]),
+        index=y.index,
     )
 
     # Drop original categorical columns
@@ -179,9 +180,6 @@ def train_model(X_train, y_train):
         "gamma": 1.99,
     }
 
-    # 🔹 log params here (NO start_run)
-    mlflow.log_params(params)
-
     model = XGBClassifier(
         **params,
         random_state=42,
@@ -190,11 +188,8 @@ def train_model(X_train, y_train):
 
     model.fit(X_train_scaled, y_train)
 
-    # 🔹 log model here
-    mlflow.sklearn.log_model(model, artifact_path="model")
-
     print("train_model(): training completed.")
-    return model, scaler
+    return model, scaler, params
 
 
 # ============================================================
@@ -209,23 +204,10 @@ def evaluate_model(model, scaler, X_test, y_test):
     y_proba = model.predict_proba(X_test_scaled)[:, 1]
 
     acc = accuracy_score(y_test, y_pred)
-    cm = confusion_matrix(y_test, y_pred)
-    report = classification_report(y_test, y_pred)
     auc = roc_auc_score(y_test, y_proba)
-
-    print("\nEvaluation Results")
-    print("Accuracy:", acc)
-    print("Confusion matrix:\n", cm)
-    print("Classification report:\n", report)
-    print("ROC-AUC:", auc)
-
-    mlflow.log_metric("accuracy", acc)
-    mlflow.log_metric("roc_auc", auc)
 
     return {
         "accuracy": acc,
-        "confusion_matrix": cm,
-        "classification_report": report,
         "roc_auc": auc,
     }
 
