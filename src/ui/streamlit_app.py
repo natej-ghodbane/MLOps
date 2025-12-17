@@ -3,115 +3,174 @@ import requests
 import os
 
 # ==========================================================
-# CONFIGURATION
-# ===========================================================
-# When running via Docker Compose, API_URL becomes: http://api:8000
+# CONFIG
+# ==========================================================
 API_URL = os.getenv("API_URL", "http://localhost:8000")
 
-st.set_page_config(page_title="Churn Predictor UI", layout="wide")
-
-st.title("📞 Churn Prediction Dashboard")
-st.write("Interface Streamlit permettant d'interagir avec votre API FastAPI.")
+st.set_page_config(
+    page_title="📞 Churn Prediction Dashboard",
+    layout="wide",
+    page_icon="📊",
+)
 
 # ==========================================================
-#                1️⃣  PREDICTION SECTION
+# SIDEBAR
 # ==========================================================
-st.header("🔮 Faire une prédiction")
+st.sidebar.title("⚙️ Configuration")
+st.sidebar.markdown("Interface de prédiction et de réentraînement du modèle.")
 
-with st.form("prediction_form"):
-    st.subheader("Données d'entrée")
+mode = st.sidebar.radio(
+    "Choisissez une action :",
+    ["🔮 Prédiction", "🔧 Réentraînement"],
+)
 
-    total_charge = st.number_input("Total charge", min_value=0.0, value=110.0)
+st.sidebar.markdown("---")
+st.sidebar.caption("MLOps Project – Churn Prediction")
 
-    col1, col2, col3 = st.columns(3)
+# ==========================================================
+# MAIN TITLE
+# ==========================================================
+st.title("📞 Customer Churn Prediction")
+st.markdown(
+    """
+    Cette application permet :
+    - 🔮 **Prédire le churn d’un client**
+    - 🔧 **Réentraîner le modèle via l’API**
+    """
+)
 
-    with col1:
-        area_415 = st.number_input("Area code 415", min_value=0, max_value=1, value=0)
-        cust_calls = st.number_input("Customer service calls", min_value=0, value=2)
-        intl_charge = st.number_input("Total intl charge", min_value=0.0, value=2.7)
+# ==========================================================
+# 1️⃣ PREDICTION MODE
+# ==========================================================
+if mode == "🔮 Prédiction":
 
-    with col2:
-        area_408 = st.number_input("Area code 408", min_value=0, max_value=1, value=1)
-        intl_calls = st.number_input("Total intl calls", min_value=0, value=3)
-        cs_rate = st.number_input("CScalls Rate", min_value=0.0, value=0.01)
+    st.header("🔮 Prédiction du churn client")
 
-    with col3:
-        area_510 = st.number_input("Area code 510", min_value=0, max_value=1, value=0)
-        international_plan = st.selectbox("International plan (0=No, 1=Yes)", [0, 1], index=0)
-        vmail = st.number_input("Number vmail messages", min_value=0, value=5)
+    with st.form("prediction_form"):
 
-    st.subheader("États encodés")
-    colA, colB, colC, colD = st.columns(4)
+        st.subheader("📋 Informations client")
 
-    with colA:
-        state_sc = st.number_input("State_SC", min_value=0, max_value=1, value=0)
-    with colB:
-        state_tx = st.number_input("State_TX", min_value=0, max_value=1, value=1)
-    with colC:
-        state_mt = st.number_input("State_MT", min_value=0, max_value=1, value=0)
-    with colD:
-        state_il = st.number_input("State_IL", min_value=0, max_value=1, value=0)
+        col1, col2, col3 = st.columns(3)
 
-    submitted = st.form_submit_button("Predict")
+        with col1:
+            total_charge = st.number_input("💰 Total charge ($)", min_value=0.0, value=110.0)
+            intl_charge = st.number_input("🌍 International charge ($)", min_value=0.0, value=2.7)
+            intl_calls = st.number_input("📞 International calls", min_value=0, value=3)
+
+        with col2:
+            cust_calls = st.number_input("☎️ Customer service calls", min_value=0, value=2)
+            cs_rate = st.number_input("📊 CS calls rate", min_value=0.0, value=0.01)
+            vmail = st.number_input("📨 Voice mail messages", min_value=0, value=5)
+
+        with col3:
+            international_plan = st.selectbox(
+                "🌐 International plan",
+                options=[0, 1],
+                format_func=lambda x: "Yes" if x == 1 else "No",
+            )
+
+            area_code = st.selectbox(
+                "📍 Area code",
+                ["408", "415", "510"],
+            )
+
+            state = st.selectbox(
+                "🏙️ State",
+                ["TX", "SC", "MT", "IL"],
+            )
+
+        submitted = st.form_submit_button("🚀 Predict churn")
 
     if submitted:
+
+        # Encode categorical fields
         features = {
             "Total charge": total_charge,
-            "Area code_415": area_415,
-            "Area code_408": area_408,
             "Customer service calls": cust_calls,
-            "Area code_510": area_510,
             "Total intl calls": intl_calls,
+            "Total intl charge": intl_charge,
             "International plan": international_plan,
             "Number vmail messages": vmail,
-            "State_SC": state_sc,
-            "State_TX": state_tx,
-            "State_MT": state_mt,
-            "Total intl charge": intl_charge,
-            "State_IL": state_il,
             "CScalls Rate": cs_rate,
+            "Area code_408": int(area_code == "408"),
+            "Area code_415": int(area_code == "415"),
+            "Area code_510": int(area_code == "510"),
+            "State_TX": int(state == "TX"),
+            "State_SC": int(state == "SC"),
+            "State_MT": int(state == "MT"),
+            "State_IL": int(state == "IL"),
         }
 
-        try:
-            resp = requests.post(f"{API_URL}/predict", json=features, timeout=300)
-            resp.raise_for_status()
+        with st.spinner("🔄 Calling FastAPI..."):
+            try:
+                resp = requests.post(f"{API_URL}/predict", json=features, timeout=10)
+                resp.raise_for_status()
+                result = resp.json()
 
-            result = resp.json()
-            st.success("✔ Prédiction effectuée")
-            st.info(f"**Probability of Churn: `{result['churn_probability']:.4f}`**")
+                churn_prob = result["churn_probability"]
 
-        except Exception as e:
-            st.error("❌ Impossible de contacter l'API FastAPI.")
-            st.exception(e)
+                st.success("✔ Prediction successful")
+
+                st.metric(
+                    label="📊 Churn probability",
+                    value=f"{churn_prob:.2%}",
+                )
+
+                st.progress(min(churn_prob, 1.0))
+
+                if churn_prob > 0.5:
+                    st.error("⚠️ High risk of churn")
+                else:
+                    st.success("✅ Low churn risk")
+
+            except Exception as e:
+                st.error("❌ API error")
+                st.exception(e)
 
 # ==========================================================
-#                2️⃣  RETRAIN SECTION
+# 2️⃣ RETRAIN MODE
 # ==========================================================
-st.header("🔧 Réentraîner le modèle")
+if mode == "🔧 Réentraînement":
 
-with st.form("retrain_form"):
-    st.subheader("Choisir les hyperparamètres")
+    st.header("🔧 Réentraîner le modèle")
 
-    n_estimators = st.slider("n_estimators", 50, 500, 150)
-    max_depth = st.slider("max_depth", 2, 12, 4)
-    learning_rate = st.number_input("learning_rate", min_value=0.001, max_value=1.0, value=0.05)
+    st.warning(
+        "⚠️ Cette action déclenche un entraînement complet "
+        "et enregistre une nouvelle version du modèle."
+    )
 
-    submitted_retrain = st.form_submit_button("Retrain Model")
+    with st.form("retrain_form"):
+
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+            n_estimators = st.slider("n_estimators", 50, 500, 150)
+
+        with col2:
+            max_depth = st.slider("max_depth", 2, 12, 6)
+
+        with col3:
+            learning_rate = st.number_input(
+                "learning_rate", min_value=0.001, max_value=1.0, value=0.05
+            )
+
+        submitted_retrain = st.form_submit_button("🔁 Retrain model")
 
     if submitted_retrain:
         params = {
             "n_estimators": n_estimators,
             "max_depth": max_depth,
-            "learning_rate": learning_rate
+            "learning_rate": learning_rate,
         }
 
-        try:
-            resp = requests.post(f"{API_URL}/retrain", json=params, timeout=10)
-            resp.raise_for_status()
+        with st.spinner("🧠 Training model..."):
+            try:
+                resp = requests.post(f"{API_URL}/retrain", json=params, timeout=30)
+                resp.raise_for_status()
 
-            st.success("🎉 Modèle réentraîné avec succès !")
-            st.json(resp.json())
+                st.success("🎉 Model retrained successfully")
+                st.json(resp.json())
 
-        except Exception as e:
-            st.error("❌ Échec du réentraînement.")
-            st.exception(e)
+            except Exception as e:
+                st.error("❌ Retraining failed")
+                st.exception(e)
